@@ -16,8 +16,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Spatie\Permission\PermissionRegistrar;
 
 class AuthController extends Controller
 {
@@ -33,7 +33,7 @@ class AuthController extends Controller
         [$business, $user] = DB::transaction(function () use ($data, $provisioner) {
             $business = Business::create([
                 'name' => $data['business_name'],
-                'slug' => $this->uniqueSlug($data['business_name']),
+                'slug' => Business::uniqueSlug($data['business_name']),
             ]);
 
             Tenant::set($business->id);
@@ -83,6 +83,14 @@ class AuthController extends Controller
 
         $token = $user->createToken('api')->plainTextToken;
 
+        // /auth/login is intentionally outside the 'tenant' middleware
+        // group (the user isn't authenticated yet when it runs), so the
+        // tenant/team context that scopes role lookups is never set by
+        // that middleware here. Set it explicitly so the response's
+        // roles/permissions are correct instead of always empty.
+        Tenant::set($user->business_id);
+        app(PermissionRegistrar::class)->setPermissionsTeamId($user->business_id);
+
         return response()->json([
             'user' => new UserResource($user->load('roles')),
             'token' => $token,
@@ -102,19 +110,5 @@ class AuthController extends Controller
             'user' => new UserResource($request->user()->load('roles')),
             'business' => new BusinessResource($request->user()->business),
         ]);
-    }
-
-    private function uniqueSlug(string $name): string
-    {
-        $base = Str::slug($name) ?: 'business';
-        $slug = $base;
-        $suffix = 1;
-
-        while (Business::withTrashed()->where('slug', $slug)->exists()) {
-            $slug = "{$base}-{$suffix}";
-            $suffix++;
-        }
-
-        return $slug;
     }
 }

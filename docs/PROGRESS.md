@@ -45,6 +45,7 @@ unchanged; they don't conflict with either scope.
 | Audit Log | ✅ | ✅ | Full, unfiltered, read-only |
 | Notifications | ✅ | ✅ | Threshold-crossing (low/out of stock) + admin-activity events; read/unread, mark-all-read |
 | Admin Users | ✅ | ✅ | List/create/edit, activate/deactivate, reset password, role assignment |
+| First-admin bootstrap | ✅ | n/a (CLI) | `php artisan app:create-admin` — interactive, production-safe; see `docs/DEPLOYMENT.md` |
 | Roles & Permissions | ✅ (read) | ✅ (read) | 3 fixed templates (Owner/Manager/Staff) per business; no custom-role builder |
 | Settings | ✅ | ✅ | General, inventory threshold default, notification toggles |
 | Reports | ✅ (thin) | ✅ | Curated filtered views over the endpoints above (see "Reports" below) |
@@ -137,6 +138,23 @@ the inventory engine:
    shipped**: an empty `whereRaw` closure for the Inventory `status`
    filter (implemented properly instead) and a route middleware group
    with no real permission behind it (removed).
+4. **`/auth/login` always returned empty `roles`/`permissions`.** Found
+   while verifying the first-admin bootstrap flow end-to-end.
+   `/auth/login` is intentionally outside the `tenant` middleware group
+   (the user isn't authenticated yet when it runs), so nothing set the
+   Spatie "team" context before the response's `UserResource` serialized
+   `$user->load('roles')` — it always resolved against team `null`,
+   finding nothing. `/auth/register` never showed this because it sets
+   tenant context itself, inline, while creating the business. The
+   practical effect: every login (not just the new admin's) left the
+   frontend with an empty `permissions` array until a full page reload
+   — every sidebar item is permission-gated, so a freshly logged-in user
+   saw a blank sidebar and no Stock IN/OUT buttons, silently, with no
+   error. Fixed on both ends: the backend now sets tenant/team context
+   explicitly in `AuthController::login()` before building the response,
+   and the frontend's `login()` now uses the `/auth/me` follow-up
+   call's user (already correct) instead of discarding it. Covered by
+   `tests/Feature/Auth/LoginTest::test_login_response_includes_the_users_roles_and_permissions`.
 
 ## Recommended next phase
 

@@ -60,8 +60,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password,
     });
     setToken(res.token);
-    setUser(res.user);
+    // /auth/login runs before tenant context exists (it's the endpoint
+    // that establishes it), so its `user.roles`/`permissions` are always
+    // empty — /auth/me is the one with a fully hydrated user.
     const me = await api.get<{ user: User; business: Business }>("/auth/me");
+    setUser(me.user);
     setBusiness(me.business);
   }, []);
 

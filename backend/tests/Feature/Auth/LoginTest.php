@@ -38,6 +38,38 @@ class LoginTest extends TestCase
         $response->assertOk()->assertJsonStructure(['token', 'user']);
     }
 
+    /**
+     * Regression test: /auth/login runs before any tenant/team context is
+     * established (that's what login itself establishes), so a naive
+     * implementation returns a user with empty roles/permissions even
+     * though they're a fully-provisioned Owner. This broke the frontend
+     * silently — a freshly logged-in user saw an empty sidebar because
+     * every nav item is permission-gated — until a full page reload
+     * (which re-fetches /auth/me) fixed it. Caught by driving the app in
+     * a real browser, not by any static check.
+     */
+    public function test_login_response_includes_the_users_roles_and_permissions(): void
+    {
+        $this->postJson('/api/v1/auth/register', [
+            'business_name' => 'Acme Retail',
+            'name' => 'Owner',
+            'email' => 'owner@acme.test',
+            'password' => 'correct-horse-battery-staple',
+            'password_confirmation' => 'correct-horse-battery-staple',
+        ])->assertCreated();
+
+        // A fresh, separate request — simulating a real second login,
+        // not just reading the register response.
+        $response = $this->postJson('/api/v1/auth/login', [
+            'email' => 'owner@acme.test',
+            'password' => 'correct-horse-battery-staple',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('user.roles.0', 'Owner')
+            ->assertJsonPath('user.permissions', fn ($permissions) => count($permissions) > 0);
+    }
+
     public function test_login_fails_with_wrong_password(): void
     {
         $business = Business::create(['name' => 'Acme', 'slug' => 'acme']);

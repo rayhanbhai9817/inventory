@@ -101,6 +101,12 @@ business-wide), `POST /notifications/{id}/read`, `POST
 /roles` — read-only; the three role templates are fixed per business (no
 custom-role builder in this phase).
 
+These endpoints all require an authenticated Owner/Manager session, so
+they can't create the *first* user for a fresh deployment. That's what
+`php artisan app:create-admin` (an interactive console command, not an
+API endpoint — see `docs/DEPLOYMENT.md` → "First Admin User Setup") is
+for.
+
 ## Settings (`settings.manage`)
 
 `GET/PUT /settings` — general (company name, timezone, date/number
