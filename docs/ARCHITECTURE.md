@@ -31,13 +31,20 @@ Next.js frontend (App Router, TypeScript, Tailwind)
 Laravel REST API (/api/v1/*)
   │
   ▼
-MySQL (production) / SQLite (local dev)
+Supabase-hosted PostgreSQL (production) / SQLite (local dev)
 ```
 
 The frontend never queries the database directly and never performs
 authoritative inventory calculations — FIFO batch consumption, stock
 balances, and permission checks are all computed and enforced
-server-side, inside database transactions.
+server-side, inside database transactions. Production's database is a
+Supabase-hosted Postgres instance, reached by Laravel's native `pgsql`
+driver via a plain connection string — Supabase's own JS/REST client
+(`@supabase/supabase-js`) is not used anywhere in this project;
+Supabase here is purely a managed Postgres host, and Laravel remains
+the only thing that ever talks to it. See `docs/DATABASE.md` for the
+connection details and the one Postgres-specific migration this
+required.
 
 ## Multi-tenancy
 
@@ -73,13 +80,15 @@ a `DB::transaction()`:
   (direction, quantity, reason, note) linked 1:1 to the `stock_movements`
   row it produced.
 
-Concurrency: on MySQL (the production target) `lockForUpdate` takes real
-row-level locks, so two simultaneous Stock OUT requests for the same
-product cannot both read the same "available" total and jointly
-over-consume it. SQLite (used for local dev/tests) serializes writes at
-a coarser grain — the *logic* is verified by
-`tests/Feature/Inventory/FifoEngineTest.php`, but genuine concurrent-load
-testing should happen against MySQL.
+Concurrency: on PostgreSQL (the production target, hosted on Supabase)
+`lockForUpdate` takes real row-level locks, so two simultaneous Stock
+OUT requests for the same product cannot both read the same
+"available" total and jointly over-consume it. SQLite (used for local
+dev/tests) serializes writes at a coarser grain — the *logic* is
+verified by `tests/Feature/Inventory/FifoEngineTest.php` (and by the
+full test suite, verified passing against a real PostgreSQL instance —
+see `docs/DATABASE.md`), but genuine concurrent-load testing should
+happen against production-shaped Postgres load.
 
 Batch codes are short random unique strings (e.g. `#1CD05DAB`, matching
 the reference UI). Movement references (`SI-000042`, `SO-000042`,

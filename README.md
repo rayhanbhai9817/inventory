@@ -8,7 +8,7 @@ scope decision.
 
 - **Frontend:** Next.js (App Router) + React + TypeScript + Tailwind CSS
 - **Backend:** Laravel (REST API) + PHP
-- **Database:** MySQL 8 (production target: Hostinger Cloud Hosting)
+- **Database:** PostgreSQL, hosted on Supabase (production); SQLite (local dev)
 - **Auth:** Laravel Sanctum (token-based API authentication)
 - **Authorization:** Spatie Laravel Permission (roles & permissions, tenant-scoped)
 
@@ -32,14 +32,16 @@ The frontend never talks to the database directly and never performs authoritati
 business calculations (stock, pricing, totals, permissions) — Laravel is the single
 source of truth for all of that.
 
-## Why MySQL, not PostgreSQL
+## Database: Supabase PostgreSQL
 
-This project targets **Hostinger Cloud Hosting** (the hPanel-based cloud plan), not a
-Hostinger VPS. Hostinger's cloud/shared hPanel only provisions **MySQL/MariaDB**
-databases through its control panel — there is no managed PostgreSQL option on that
-tier. Since production deployment is the hard constraint, the schema and Laravel
-config target MySQL 8. Local development in this repository can run on SQLite
-(Laravel's zero-setup file database) since the migrations avoid MySQL-only syntax.
+Production uses a **Supabase-hosted PostgreSQL** database. Laravel connects to it
+directly over a standard Postgres connection (host/port/database/username/password —
+see `docs/DATABASE.md`) via its native `pgsql` driver — Laravel remains the sole owner
+of the database and all business logic; Supabase's JS/REST client
+(`@supabase/supabase-js`) is not used anywhere in this project, and the frontend has
+no database access of any kind. All 21 migrations (20 schema + 1 Postgres-specific
+constraint fix, documented in `docs/DATABASE.md`) are verified against a real
+PostgreSQL instance, in addition to SQLite for local development.
 
 ## Multi-tenancy model
 
@@ -57,7 +59,8 @@ the frontend is never trusted to filter tenant data. See
 
 - PHP 8.3+ and Composer
 - Node.js 20+ and npm
-- MySQL 8 (recommended) or SQLite for quick local development
+- SQLite for local development (no setup required); PostgreSQL for anything
+  production-shaped (see `docs/DATABASE.md` for connecting to Supabase)
 
 ### Backend (Laravel)
 
@@ -103,15 +106,16 @@ every variable it needs:
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — system architecture, tenancy, auth
 - [`docs/API.md`](docs/API.md) — REST API reference
+- [`docs/DATABASE.md`](docs/DATABASE.md) — schema reference and Supabase PostgreSQL connection details
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Hostinger Cloud deployment guide
 - [`docs/PROGRESS.md`](docs/PROGRESS.md) — module-by-module implementation status
 
 ## Production data safety
 
-Production customer/business data lives **only** in the Hostinger production MySQL
-database. It must never be copied into this repository, into seeders, into test
-fixtures, or into this development environment. Seeders in this repo generate
-synthetic development data only.
+Production customer/business data lives **only** in the Supabase production
+PostgreSQL database. It must never be copied into this repository, into seeders,
+into test fixtures, or into this development environment. Seeders in this repo
+generate synthetic development data only.
 
 ## License
 

@@ -7,17 +7,25 @@ assumes Hostinger's **Cloud Hosting** plan (hPanel-based), not a VPS.
 
 ## Why this plan shapes the setup
 
-Hostinger Cloud Hosting provisions **MySQL** databases through hPanel —
-there is no managed PostgreSQL on this tier (that requires a VPS with
-root access). The backend targets MySQL 8 in production for this reason;
-see `README.md` → "Why MySQL, not PostgreSQL" for the fuller rationale.
+The frontend (Next.js) and backend (Laravel) are deployed to Hostinger
+Cloud Hosting as described below. The **database is not hosted by
+Hostinger** — it's a **Supabase-hosted PostgreSQL** database, reached
+by Laravel over a standard Postgres connection string. Supabase is a
+separate, independent service from Hostinger; nothing about Hostinger's
+own database offering (or lack of one) constrains this. See
+`docs/DATABASE.md` for exactly which values to copy from your Supabase
+project and where.
 
 ## 1. Backend (Laravel)
 
-1. In hPanel, create a MySQL database and user; note host/db/user/password.
-2. Upload the `backend/` directory to your hosting account (Git deploy,
-   SFTP, or hPanel's Git integration if available). The document root
-   for the PHP app must point at `backend/public`.
+1. In your Supabase project dashboard, go to **Settings → Database →
+   Connection parameters** and note the host, port, database name,
+   username, and the database password you set at project creation.
+   See `docs/DATABASE.md` for the full field-by-field guide, including
+   the 5432-vs-6543 port choice.
+2. Upload the `backend/` directory to your Hostinger hosting account
+   (Git deploy, SFTP, or hPanel's Git integration if available). The
+   document root for the PHP app must point at `backend/public`.
 3. On the server:
    ```bash
    composer install --no-dev --optimize-autoloader
@@ -29,14 +37,19 @@ see `README.md` → "Why MySQL, not PostgreSQL" for the fuller rationale.
    APP_ENV=production
    APP_DEBUG=false
    APP_URL=https://api.yourdomain.com
-   DB_CONNECTION=mysql
-   DB_HOST=<hPanel MySQL host>
-   DB_PORT=3306
-   DB_DATABASE=<hPanel database name>
-   DB_USERNAME=<hPanel database user>
-   DB_PASSWORD=<hPanel database password>
+   DB_CONNECTION=pgsql
+   DB_HOST=<from Supabase Settings → Database>
+   DB_PORT=5432
+   DB_DATABASE=<from Supabase Settings → Database — usually "postgres">
+   DB_USERNAME=<from Supabase Settings → Database — usually "postgres">
+   DB_PASSWORD=<the database password you set when creating the Supabase project>
+   DB_SSLMODE=require
    CORS_ALLOWED_ORIGINS=https://app.yourdomain.com
    ```
+   `DB_SSLMODE=require` is mandatory — Supabase does not accept
+   unencrypted Postgres connections. Never type the real password into
+   this repository, a commit, or a chat — it goes only into this one
+   `.env` file on the production server (already gitignored).
 5. Run migrations and seed the (tenant-safe) permission catalog only —
    **never** run `DemoDataSeeder` against production:
    ```bash
@@ -61,7 +74,10 @@ see `README.md` → "Why MySQL, not PostgreSQL" for the fuller rationale.
    ```
 7. Point your web server (Apache via hPanel, or nginx on a more advanced
    setup) at `backend/public`, with PHP-FPM matching the `composer.json`
-   requirement (`^8.3`).
+   requirement (`^8.3`), and with the **`pdo_pgsql`** PHP extension
+   enabled (needed to reach the Supabase Postgres database — most
+   general-purpose Hostinger PHP hosting has this available, but
+   confirm in hPanel's PHP configuration screen).
 
 ### Production data safety
 
@@ -159,13 +175,14 @@ do this against production" below.
 ### D. Do I need to configure `.env`?
 
 Yes — this must already be done (step 1.4): real `DB_*` credentials
-pointing at your Hostinger MySQL database, and `CORS_ALLOWED_ORIGINS`
+pointing at your Supabase production PostgreSQL database (`DB_CONNECTION=pgsql`,
+`DB_SSLMODE=require` — see `docs/DATABASE.md`), and `CORS_ALLOWED_ORIGINS`
 set to your real frontend URL. `app:create-admin` writes through
 whatever database connection your `.env` currently points at — that is
-exactly why `.env` must be configured for Hostinger's production
+exactly why `.env` must be configured for the real Supabase production
 database *before* you run it, not Claude's development database, not a
 local SQLite file. There's no separate credential store: your
-production `.env` is what makes this "the Hostinger production
+production `.env` is what makes this "the Supabase production
 database."
 
 ### E. How the Next.js frontend connects to the Laravel API

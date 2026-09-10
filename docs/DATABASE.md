@@ -9,6 +9,48 @@ below. Every table here follows the same multi-tenant convention as the
 rest of the schema: a `business_id` foreign key, enforced server-side via
 the `BelongsToTenant` trait, never trusted from client input.
 
+## Production database: Supabase PostgreSQL
+
+Production uses a **Supabase-hosted PostgreSQL database**, connected to
+directly by Laravel via its native `pgsql` driver — Laravel is still the
+only thing that talks to the database (see `docs/ARCHITECTURE.md`).
+Supabase's REST/JS client layer (`@supabase/supabase-js`) is **not**
+used anywhere in this project; Supabase here is purely a managed
+Postgres host, reached with a plain database connection string exactly
+the way MySQL was reached before.
+
+All 21 migrations (20 pre-existing + the one Postgres-specific fix
+below) were verified against a real local PostgreSQL 16 instance —
+`php artisan migrate --force` and the full `php artisan test` suite
+both run clean. See "Migration order" below for the one Postgres-only
+fix this required.
+
+### Values you need from your Supabase dashboard
+
+Supabase project → **Settings → Database** → **Connection parameters**:
+
+| `.env` variable | What it is | Where on the Supabase dashboard |
+|---|---|---|
+| `DB_HOST` | Database host | "Host" field under Connection parameters |
+| `DB_PORT` | `5432` for a direct connection, `6543` for the connection-pooler (PgBouncer) endpoint | Shown next to each connection mode Supabase offers |
+| `DB_DATABASE` | Database name | "Database name" — Supabase's default is `postgres` |
+| `DB_USERNAME` | Database user | "User" — Supabase's default is `postgres` |
+| `DB_PASSWORD` | The database password you set when creating the Supabase project (**not** any API key) | You set this yourself at project creation; reset it from Settings → Database if forgotten |
+| `DB_SSLMODE` | `require` | Not shown on the dashboard — Supabase mandates SSL, so this is always `require` regardless of what the dashboard displays |
+
+**Port 5432 vs 6543**: 5432 is a direct connection to Postgres itself.
+6543 goes through Supabase's PgBouncer connection pooler, recommended
+when many short-lived connections are expected (typical for a
+PHP-FPM-hosted Laravel app where each request opens its own
+connection). Either works with Laravel's `pgsql` driver; start with
+5432 for simplicity, move to 6543 if you see connection-limit issues
+under load.
+
+None of these are typed into this repository or committed to Git —
+they go only into the production server's own `backend/.env` file,
+which is gitignored (see `.gitignore` and `backend/.env.example`, which
+contains blank placeholders, not real values).
+
 ## `suppliers`
 
 | Column | Type | Notes |
@@ -103,7 +145,22 @@ create_supplier_products_table
 create_product_prices_table
 add_supplier_id_to_stock_batches_table
 widen_notifications_type_column
+drop_stale_notifications_type_check_on_pgsql
 ```
 
 All are additive or widening — none of them alter or drop any existing
 inventory-engine column, and none require a data backfill.
+
+The last one, `drop_stale_notifications_type_check_on_pgsql`, exists
+only because of a driver difference: Laravel implements `enum()` on
+Postgres as `VARCHAR` + a `CHECK` constraint (MySQL uses a native
+`ENUM` type; SQLite enforces nothing). `widen_notifications_type_column`
+correctly widened the column on every driver, but left that old
+Postgres-only check constraint in place — so on Postgres specifically,
+inserting any notification `type` added after the original six
+(`supplier_added`, `product_missing_supplier`, `product_missing_price`)
+failed with `SQLSTATE[23514]: Check violation`. This migration drops
+that constraint, guarded to run only on `pgsql` — a genuine no-op on
+MySQL/SQLite, which never had the problem. Found and fixed by actually
+running the full test suite against a real Postgres instance, not by
+inspection alone (11/48 tests failed before the fix, 0 after).
