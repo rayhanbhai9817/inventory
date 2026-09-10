@@ -12,8 +12,9 @@ class BatchController extends Controller
     public function index(Request $request)
     {
         $batches = StockBatch::query()
-            ->with(['product', 'creator'])
+            ->with(['product', 'creator', 'supplier'])
             ->when($request->integer('product_id'), fn ($q, $id) => $q->where('product_id', $id))
+            ->when($request->integer('supplier_id'), fn ($q, $id) => $q->where('supplier_id', $id))
             ->when($request->string('status')->toString(), fn ($q, $status) => $q->where('status', $status))
             ->when($request->string('search')->toString(), fn ($q, $search) => $q->where('batch_code', 'like', "%{$search}%"))
             ->orderByDesc('received_at')
@@ -24,6 +25,6 @@ class BatchController extends Controller
 
     public function show(StockBatch $batch)
     {
-        return new StockBatchResource($batch->load(['product', 'creator']));
+        return new StockBatchResource($batch->load(['product', 'creator', 'supplier']));
     }
 }

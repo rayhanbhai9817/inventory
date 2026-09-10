@@ -18,6 +18,11 @@ class StockBatchResource extends JsonResource
                 'name' => $this->product->name,
                 'sku' => $this->product->sku,
             ]),
+            'supplier_id' => $this->supplier_id,
+            'supplier' => $this->whenLoaded('supplier', fn () => $this->supplier ? [
+                'id' => $this->supplier->id,
+                'name' => $this->supplier->name,
+            ] : null),
             'boxes' => $this->boxes,
             'units_per_box' => $this->units_per_box,
             'total_units' => $this->total_units,

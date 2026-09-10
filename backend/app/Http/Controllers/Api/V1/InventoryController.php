@@ -76,7 +76,12 @@ class InventoryController extends Controller
 
     public function show(Product $product)
     {
-        $product->load(['category', 'batches' => fn ($q) => $q->orderBy('received_at')->orderBy('id')]);
+        $product->load([
+            'category',
+            'batches' => fn ($q) => $q->orderBy('received_at')->orderBy('id'),
+            'batches.supplier',
+            'suppliers',
+        ]);
 
         $activeBatches = $product->batches->where('status', '!=', 'depleted');
         $totalUnits = (int) $activeBatches->sum('remaining_units');
@@ -91,6 +96,10 @@ class InventoryController extends Controller
             ->latest('created_at')
             ->limit(20)
             ->get();
+
+        $primarySupplier = $product->suppliers->firstWhere('pivot.is_primary', true);
+        $lastStockInBatch = $product->batches->sortByDesc('received_at')->first(fn ($b) => $b->supplier_id !== null);
+        $currentPrice = $product->currentPrice();
 
         return response()->json([
             'data' => [
@@ -117,6 +126,29 @@ class InventoryController extends Controller
                 ],
                 'batches' => StockBatchResource::collection($product->batches),
                 'recent_movements' => StockMovementResource::collection($recentMovements),
+                'supplier_info' => [
+                    'primary_supplier' => $primarySupplier ? [
+                        'id' => $primarySupplier->id,
+                        'name' => $primarySupplier->name,
+                        'supplier_sku' => $primarySupplier->pivot->supplier_sku,
+                    ] : null,
+                    'other_suppliers' => $product->suppliers
+                        ->reject(fn ($s) => $primarySupplier && $s->id === $primarySupplier->id)
+                        ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])
+                        ->values(),
+                    'last_stock_in_supplier' => $lastStockInBatch?->supplier ? [
+                        'id' => $lastStockInBatch->supplier->id,
+                        'name' => $lastStockInBatch->supplier->name,
+                        'received_at' => $lastStockInBatch->received_at?->format('Y-m-d'),
+                    ] : null,
+                    'has_supplier' => $product->suppliers->isNotEmpty(),
+                ],
+                'price_info' => [
+                    'current_price' => $currentPrice ? (string) $currentPrice->price : null,
+                    'currency' => $currentPrice?->currency,
+                    'effective_date' => $currentPrice?->effective_date?->format('Y-m-d'),
+                    'has_price' => $currentPrice !== null,
+                ],
             ],
         ]);
     }

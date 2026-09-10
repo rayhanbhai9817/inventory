@@ -29,6 +29,9 @@ class PermissionCatalog
             'users' => ['view', 'create', 'edit', 'delete'],
             'roles' => ['view'],
             'settings' => ['manage'],
+            'suppliers' => ['view', 'create', 'update', 'archive'],
+            'product_prices' => ['view', 'create', 'update', 'history'],
+            'supplier_reports' => ['view', 'export'],
         ];
 
         $permissions = [];
@@ -59,6 +62,7 @@ class PermissionCatalog
                 'stock.in', 'stock.out', 'stock.adjust',
                 'ledger.view', 'activity.view',
                 'reports.*',
+                'suppliers.*', 'product_prices.*', 'supplier_reports.*',
             ],
 
             'Staff' => [
@@ -67,6 +71,10 @@ class PermissionCatalog
                 'inventory.view', 'batches.view',
                 'stock.in', 'stock.out',
                 'ledger.view',
+                // Needs to pick a supplier while performing Stock IN, but
+                // price data is admin-only reference information by design
+                // (see docs/ARCHITECTURE.md) — Staff never gets product_prices.*.
+                'suppliers.view',
             ],
         ];
     }

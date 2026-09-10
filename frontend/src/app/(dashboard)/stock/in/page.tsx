@@ -3,15 +3,19 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
-import type { PaginatedResponse, Product } from "@/types";
+import { useAuth } from "@/lib/auth-context";
+import type { PaginatedResponse, Product, Supplier } from "@/types";
 import { Card } from "@/components/ui/Card";
 import { Input, Select } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 
 export default function StockInPage() {
   const router = useRouter();
+  const { can } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [productId, setProductId] = useState("");
+  const [supplierId, setSupplierId] = useState("");
   const [boxes, setBoxes] = useState("");
   const [unitsPerBox, setUnitsPerBox] = useState("");
   const [receivedAt, setReceivedAt] = useState(() => new Date().toISOString().slice(0, 10));
@@ -25,6 +29,12 @@ export default function StockInPage() {
     api.get<PaginatedResponse<Product>>("/products", { tab: "active", per_page: 200 }).then((res) => {
       setProducts(res.data);
     });
+    if (can("suppliers.view")) {
+      api.get<PaginatedResponse<Supplier>>("/suppliers", { tab: "active", per_page: 200 }).then((res) => {
+        setSuppliers(res.data);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const totalUnits = Number(boxes || 0) * Number(unitsPerBox || 0);
@@ -42,11 +52,13 @@ export default function StockInPage() {
         units_per_box: Number(unitsPerBox),
         received_at: receivedAt,
         notes: notes || undefined,
+        supplier_id: supplierId ? Number(supplierId) : undefined,
       });
       setSuccess(`Stock IN recorded (${res.data.reference}). ${totalUnits} units added.`);
       setBoxes("");
       setUnitsPerBox("");
       setNotes("");
+      setSupplierId("");
     } catch (err) {
       if (err instanceof ApiError) {
         setFieldErrors(err.fieldErrors());
@@ -104,6 +116,22 @@ export default function StockInPage() {
           <p className="text-sm text-slate-500">
             Total units: <span className="font-semibold text-slate-900">{totalUnits}</span>
           </p>
+
+          {suppliers.length > 0 && (
+            <Select
+              label="Supplier (optional)"
+              value={supplierId}
+              error={fieldErrors.supplier_id}
+              onChange={(e) => setSupplierId(e.target.value)}
+            >
+              <option value="">No supplier / unknown</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </Select>
+          )}
 
           <Input
             label="Received date"

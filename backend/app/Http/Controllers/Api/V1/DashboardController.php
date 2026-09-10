@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\StockMovementResource;
 use App\Models\Product;
+use App\Models\StockBatch;
 use App\Models\StockMovement;
+use App\Models\Supplier;
 use App\Support\Tenant;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -60,6 +62,9 @@ class DashboardController extends Controller
             ->limit(10)
             ->get();
 
+        $productsMissingSupplier = Product::query()->active()->doesntHave('suppliers')->get(['id', 'name', 'sku']);
+        $productsMissingPrice = Product::query()->active()->doesntHave('prices')->get(['id', 'name', 'sku']);
+
         return response()->json([
             'data' => [
                 'period' => [
@@ -85,8 +90,57 @@ class DashboardController extends Controller
                     'out_of_stock_count' => $outOfStockCount,
                 ],
                 'recent_movements' => StockMovementResource::collection($recentMovements),
+                'supplier_summary' => $this->supplierSummary($periodStart, $periodEnd),
+                'product_alerts' => [
+                    'missing_supplier_count' => $productsMissingSupplier->count(),
+                    'missing_supplier_sample' => $productsMissingSupplier->take(5)->map(fn ($p) => [
+                        'id' => $p->id, 'name' => $p->name, 'sku' => $p->sku,
+                    ])->values(),
+                    'missing_price_count' => $productsMissingPrice->count(),
+                    'missing_price_sample' => $productsMissingPrice->take(5)->map(fn ($p) => [
+                        'id' => $p->id, 'name' => $p->name, 'sku' => $p->sku,
+                    ])->values(),
+                ],
             ],
         ]);
+    }
+
+    /**
+     * Supplier KPIs. Purely counts/quantities derived from suppliers and
+     * stock_batches — no pricing or financial data involved.
+     */
+    private function supplierSummary(Carbon $periodStart, Carbon $periodEnd): array
+    {
+        $totalSuppliers = Supplier::query()->notArchived()->count();
+        $activeSuppliers = Supplier::query()->active()->count();
+
+        $recentlyUsedSuppliers = StockBatch::query()
+            ->whereNotNull('supplier_id')
+            ->whereDate('received_at', '>=', $periodStart->toDateString())
+            ->whereDate('received_at', '<=', $periodEnd->toDateString())
+            ->distinct('supplier_id')
+            ->count('supplier_id');
+
+        $topSuppliers = Supplier::query()
+            ->notArchived()
+            ->withSum('batches as total_units_supplied', 'total_units')
+            ->orderByDesc('total_units_supplied')
+            ->limit(5)
+            ->get()
+            ->filter(fn ($s) => $s->total_units_supplied > 0)
+            ->map(fn ($s) => [
+                'id' => $s->id,
+                'name' => $s->name,
+                'total_units_supplied' => (int) $s->total_units_supplied,
+            ])
+            ->values();
+
+        return [
+            'total_suppliers' => $totalSuppliers,
+            'active_suppliers' => $activeSuppliers,
+            'recently_used_suppliers' => $recentlyUsedSuppliers,
+            'top_suppliers_by_quantity' => $topSuppliers,
+        ];
     }
 
     /**

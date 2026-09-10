@@ -27,6 +27,7 @@ class StockController extends Controller
             $data['received_at'],
             $data['notes'] ?? null,
             $request->user(),
+            $data['supplier_id'] ?? null,
         );
 
         return response()->json(['data' => new StockMovementResource($movement)], 201);

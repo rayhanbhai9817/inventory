@@ -12,6 +12,22 @@ const REPORTS = [
   { title: "Stock Movement", description: "Full movement ledger — every transaction.", href: "/stock-ledger" },
   { title: "Batch Inventory", description: "FIFO batches, by status and product.", href: "/batches" },
   { title: "Daily Activity", description: "Operational activity for a given day.", href: "/activity" },
+  { title: "Supplier Report", description: "Products supplied and total units, per supplier.", href: "/reports/suppliers" },
+  {
+    title: "Product ↔ Supplier Report",
+    description: "Which suppliers each product is linked to.",
+    href: "/reports/product-suppliers",
+  },
+  {
+    title: "Product Price Report",
+    description: "Current reference price per product — never inventory value.",
+    href: "/product-prices",
+  },
+  {
+    title: "Stock In by Supplier",
+    description: "Every batch received, filterable by supplier.",
+    href: "/batches",
+  },
 ];
 
 export default function ReportsPage() {

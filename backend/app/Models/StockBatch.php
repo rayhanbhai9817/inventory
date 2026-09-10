@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
-    'business_id', 'product_id', 'batch_code', 'boxes', 'units_per_box',
+    'business_id', 'product_id', 'supplier_id', 'batch_code', 'boxes', 'units_per_box',
     'total_units', 'remaining_units', 'status', 'received_at', 'notes', 'created_by',
 ])]
 class StockBatch extends Model
@@ -26,6 +26,11 @@ class StockBatch extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class);
     }
 
     public function creator(): BelongsTo

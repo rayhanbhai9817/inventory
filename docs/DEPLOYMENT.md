@@ -1,9 +1,9 @@
 # Deployment — Hostinger Cloud Hosting
 
 This guide covers deploying the current state of the application (auth,
-tenancy, RBAC, and the catalog modules — see `docs/PROGRESS.md` for what
-is and isn't live yet). It assumes Hostinger's **Cloud Hosting** plan
-(hPanel-based), not a VPS.
+tenancy, RBAC, the inventory/catalog modules, and Suppliers + Product
+Pricing — see `docs/PROGRESS.md` for what is and isn't live yet). It
+assumes Hostinger's **Cloud Hosting** plan (hPanel-based), not a VPS.
 
 ## Why this plan shapes the setup
 
@@ -42,7 +42,18 @@ see `README.md` → "Why MySQL, not PostgreSQL" for the fuller rationale.
    ```bash
    php artisan migrate --force
    php artisan db:seed --class=PermissionSeeder --force
+   php artisan app:sync-role-permissions
    ```
+   The third command is required on **every** deploy that adds new
+   permissions to the catalog (this one included — it added `suppliers.*`,
+   `product_prices.*`, `supplier_reports.*`), not just the first deploy.
+   `PermissionSeeder` only creates the global `Permission` rows;
+   `app:sync-role-permissions` is what re-syncs each already-provisioned
+   business's Owner/Manager/Staff roles to include them — a business that
+   registered before this deploy will not see the new Suppliers/Product
+   Prices sidebar items or be able to use those permissions until this
+   runs. It's idempotent and safe to run on every deploy going forward,
+   even ones that don't change the permission catalog.
 6. Cache config/routes for performance:
    ```bash
    php artisan config:cache
@@ -208,6 +219,8 @@ path that works before any admin account exists yet to log in with.
 - [ ] `php artisan migrate --force` output reviewed — never run a
       migration against production without understanding what it changes
 - [ ] `php artisan db:seed --class=PermissionSeeder --force` run
+- [ ] `php artisan app:sync-role-permissions` run (required on **every**
+      deploy that adds permissions, including this one — see step 1.5)
 - [ ] `php artisan app:create-admin` run over SSH, first Owner account
       created, login verified (see section 3)
 - [ ] Storage/log directories writable by the web server user

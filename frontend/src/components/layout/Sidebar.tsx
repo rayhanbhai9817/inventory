@@ -29,11 +29,16 @@ const NAV: NavGroup[] = [
     ],
   },
   {
-    label: "Product Management",
+    label: "Products",
     items: [
       { href: "/products", label: "Products", permission: "products.view" },
       { href: "/categories", label: "Categories", permission: "categories.view" },
+      { href: "/product-prices", label: "Product Prices", permission: "product_prices.view" },
     ],
+  },
+  {
+    label: "Suppliers",
+    items: [{ href: "/suppliers", label: "Suppliers", permission: "suppliers.view" }],
   },
   {
     label: "Activity",

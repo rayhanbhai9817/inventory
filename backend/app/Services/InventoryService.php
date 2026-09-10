@@ -39,17 +39,19 @@ class InventoryService
         string $receivedAt,
         ?string $notes,
         User $user,
+        ?int $supplierId = null,
     ): StockMovement {
         if ($boxes <= 0 || $unitsPerBox <= 0) {
             throw new InvalidArgumentException('Boxes and units per box must both be greater than zero.');
         }
 
-        return DB::transaction(function () use ($product, $boxes, $unitsPerBox, $receivedAt, $notes, $user) {
+        return DB::transaction(function () use ($product, $boxes, $unitsPerBox, $receivedAt, $notes, $user, $supplierId) {
             $balanceBefore = $product->totalRemainingUnits();
             $totalUnits = $boxes * $unitsPerBox;
 
             $batch = StockBatch::create([
                 'product_id' => $product->id,
+                'supplier_id' => $supplierId,
                 'batch_code' => $this->uniqueBatchCode(),
                 'boxes' => $boxes,
                 'units_per_box' => $unitsPerBox,
@@ -81,6 +83,7 @@ class InventoryService
                 'boxes' => $boxes,
                 'units_per_box' => $unitsPerBox,
                 'total_units' => $totalUnits,
+                'supplier_id' => $supplierId,
             ], $user);
 
             return $movement->load('batchLinks.batch');

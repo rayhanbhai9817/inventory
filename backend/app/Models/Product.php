@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -68,6 +69,29 @@ class Product extends Model
     public function movements(): HasMany
     {
         return $this->hasMany(StockMovement::class);
+    }
+
+    public function suppliers(): BelongsToMany
+    {
+        return $this->belongsToMany(Supplier::class, 'supplier_products')
+            ->withPivot(['supplier_sku', 'supplier_product_name', 'notes', 'is_primary', 'status'])
+            ->withTimestamps();
+    }
+
+    public function prices(): HasMany
+    {
+        return $this->hasMany(ProductPrice::class);
+    }
+
+    /**
+     * Latest reference price by effective_date — "current price" is
+     * derived, never cached, so it can never drift from the history it's
+     * drawn from. Purely administrative reference data; never used by
+     * the inventory engine.
+     */
+    public function currentPrice(): ?ProductPrice
+    {
+        return $this->prices()->orderByDesc('effective_date')->orderByDesc('id')->first();
     }
 
     /**

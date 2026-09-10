@@ -1,22 +1,37 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { formatDate } from "@/lib/format";
-import type { PaginatedResponse, StockBatch } from "@/types";
+import type { PaginatedResponse, StockBatch, Supplier } from "@/types";
 import { Card } from "@/components/ui/Card";
 import { Input, Select } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { BatchStatusBadge } from "@/components/ui/Badge";
 
 export default function BatchesPage() {
+  const { can } = useAuth();
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [supplierId, setSupplierId] = useState(searchParams.get("supplier_id") ?? "");
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [page, setPage] = useState(1);
   const [data, setData] = useState<StockBatch[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (can("suppliers.view")) {
+      api.get<PaginatedResponse<Supplier>>("/suppliers", { tab: "active", per_page: 200 }).then((res) => {
+        setSuppliers(res.data);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -25,6 +40,7 @@ export default function BatchesPage() {
       const res = await api.get<PaginatedResponse<StockBatch>>("/batches", {
         search: search || undefined,
         status: status || undefined,
+        supplier_id: supplierId || undefined,
         page,
       });
       setData(res.data);
@@ -34,7 +50,7 @@ export default function BatchesPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, status, page]);
+  }, [search, status, supplierId, page]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -71,6 +87,22 @@ export default function BatchesPage() {
           <option value="partial">Partial</option>
           <option value="depleted">Depleted</option>
         </Select>
+        {suppliers.length > 0 && (
+          <Select
+            value={supplierId}
+            onChange={(e) => {
+              setPage(1);
+              setSupplierId(e.target.value);
+            }}
+          >
+            <option value="">All Suppliers</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </Select>
+        )}
       </div>
 
       <Card>
@@ -85,6 +117,7 @@ export default function BatchesPage() {
               <tr>
                 <th className="px-4 py-3 font-medium">Batch</th>
                 <th className="px-4 py-3 font-medium">Product</th>
+                <th className="px-4 py-3 font-medium">Supplier</th>
                 <th className="px-4 py-3 font-medium">Received</th>
                 <th className="px-4 py-3 font-medium">Boxes</th>
                 <th className="px-4 py-3 font-medium">Ratio</th>
@@ -99,6 +132,7 @@ export default function BatchesPage() {
                   <td className="px-4 py-3 text-slate-900">
                     {b.product?.name} <span className="text-slate-400">({b.product?.sku})</span>
                   </td>
+                  <td className="px-4 py-3 text-slate-600">{b.supplier?.name ?? "—"}</td>
                   <td className="px-4 py-3 text-slate-500">{formatDate(b.received_at)}</td>
                   <td className="px-4 py-3 text-slate-700">
                     {b.remaining_boxes}/{b.boxes}

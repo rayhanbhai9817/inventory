@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type { InventoryDetail, SingleResponse } from "@/types";
@@ -58,6 +59,47 @@ export function InventoryRowDetail({ productId }: { productId: number }) {
         </DetailCard>
       </div>
 
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <DetailCard title="Supplier Info">
+          <Row label="Primary Supplier" value={detail.supplier_info.primary_supplier?.name ?? "—"} />
+          <Row
+            label="Other Suppliers"
+            value={
+              detail.supplier_info.other_suppliers.length > 0
+                ? detail.supplier_info.other_suppliers.map((s) => s.name).join(", ")
+                : "—"
+            }
+          />
+          <Row
+            label="Last Stock In From"
+            value={detail.supplier_info.last_stock_in_supplier?.name ?? "—"}
+          />
+          {!detail.supplier_info.has_supplier && (
+            <p className="mt-2 text-xs font-medium text-amber-600">No supplier linked to this product.</p>
+          )}
+        </DetailCard>
+        <DetailCard title="Price Info">
+          <Row
+            label="Current Price"
+            value={
+              detail.price_info.has_price
+                ? `${detail.price_info.currency} ${detail.price_info.current_price}`
+                : "—"
+            }
+          />
+          <Row label="Effective Date" value={detail.price_info.effective_date ?? "—"} />
+          {!detail.price_info.has_price && (
+            <p className="mt-2 text-xs font-medium text-amber-600">No reference price set for this product.</p>
+          )}
+          <Link
+            href={`/product-prices/${detail.product.id}`}
+            className="mt-2 inline-block text-xs text-indigo-600 hover:underline"
+          >
+            {detail.price_info.has_price ? "View price history →" : "Set a price →"}
+          </Link>
+        </DetailCard>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-lg border border-slate-200 bg-white">
           <div className="border-b border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
@@ -71,6 +113,7 @@ export function InventoryRowDetail({ productId }: { productId: number }) {
                 <tr>
                   <th className="px-4 py-2 font-medium">Date</th>
                   <th className="px-4 py-2 font-medium">Batch</th>
+                  <th className="px-4 py-2 font-medium">Supplier</th>
                   <th className="px-4 py-2 font-medium">Boxes</th>
                   <th className="px-4 py-2 font-medium">Ratio</th>
                   <th className="px-4 py-2 font-medium">Units</th>
@@ -82,6 +125,7 @@ export function InventoryRowDetail({ productId }: { productId: number }) {
                   <tr key={b.id} className="border-t border-slate-100">
                     <td className="px-4 py-2 text-slate-600">{formatDate(b.received_at)}</td>
                     <td className="px-4 py-2 font-mono text-slate-600">#{b.batch_code}</td>
+                    <td className="px-4 py-2 text-slate-600">{b.supplier?.name ?? "—"}</td>
                     <td className="px-4 py-2 text-slate-600">
                       {b.remaining_boxes}/{b.boxes}
                     </td>

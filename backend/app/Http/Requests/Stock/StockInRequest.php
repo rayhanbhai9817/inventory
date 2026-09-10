@@ -24,6 +24,10 @@ class StockInRequest extends FormRequest
             'units_per_box' => ['required', 'integer', 'min:1'],
             'received_at' => ['required', 'date'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'supplier_id' => [
+                'nullable',
+                Rule::exists('suppliers', 'id')->where('business_id', Tenant::id()),
+            ],
         ];
     }
 }

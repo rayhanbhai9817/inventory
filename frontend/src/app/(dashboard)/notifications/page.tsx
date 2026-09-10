@@ -13,6 +13,9 @@ const TYPE_STYLES: Record<string, string> = {
   stock_out: "bg-slate-100 text-slate-700",
   adjustment: "bg-indigo-100 text-indigo-700",
   admin_activity: "bg-slate-100 text-slate-600",
+  supplier_added: "bg-sky-100 text-sky-700",
+  product_missing_supplier: "bg-amber-100 text-amber-700",
+  product_missing_price: "bg-amber-100 text-amber-700",
 };
 
 export default function NotificationsPage() {

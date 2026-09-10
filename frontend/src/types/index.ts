@@ -79,6 +79,8 @@ export interface StockBatch {
   batch_code: string;
   product_id: number;
   product?: { id: number; name: string; sku: string };
+  supplier_id: number | null;
+  supplier?: { id: number; name: string } | null;
   boxes: number;
   units_per_box: number;
   total_units: number;
@@ -89,6 +91,104 @@ export interface StockBatch {
   notes: string | null;
   created_by?: string;
   created_at: string;
+}
+
+export type SupplierStatus = "active" | "inactive" | "archived";
+
+export interface Supplier {
+  id: number;
+  name: string;
+  company_name: string | null;
+  contact_person: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  website: string | null;
+  tax_number: string | null;
+  notes: string | null;
+  status: SupplierStatus;
+  product_count?: number;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SuppliedProduct {
+  product_id: number;
+  product_name: string | null;
+  sku: string | null;
+  supplier_sku: string | null;
+  supplier_product_name: string | null;
+  is_primary: boolean;
+  status: string;
+  first_supplied_at: string | null;
+  last_supplied_at: string | null;
+}
+
+export interface SupplierDetail {
+  supplier: Supplier;
+  supplied_products: SuppliedProduct[];
+  totals: { total_products_supplied: number; total_stock_in_quantity: number };
+  recent_stock_in: StockBatch[];
+}
+
+export interface SupplierProduct {
+  id: number;
+  supplier?: { id: number; name: string };
+  product?: { id: number; name: string; sku: string };
+  supplier_sku: string | null;
+  supplier_product_name: string | null;
+  notes: string | null;
+  is_primary: boolean;
+  status: string;
+  created_at: string;
+}
+
+export interface ProductPrice {
+  id: number;
+  product_id: number;
+  price: string;
+  currency: string;
+  effective_date: string;
+  notes: string | null;
+  created_by?: string | null;
+  created_at: string;
+}
+
+export interface ProductPriceCatalogRow {
+  product_id: number;
+  product_name: string;
+  sku: string;
+  category: string | null;
+  status: string;
+  current_price: string | null;
+  currency: string | null;
+  effective_date: string | null;
+  has_price: boolean;
+}
+
+export interface SupplierReportRow {
+  supplier_id: number;
+  supplier_name: string;
+  status: string;
+  products_supplied: number;
+  batches_received: number;
+  total_units_supplied: number;
+  last_stock_in_at: string | null;
+}
+
+export interface ProductSupplierReportRow {
+  product_id: number;
+  product_name: string;
+  sku: string;
+  category: string | null;
+  primary_supplier: string | null;
+  supplier_count: number;
+  suppliers: string[];
+  has_supplier: boolean;
 }
 
 export type MovementType = "stock_in" | "stock_out" | "adjustment_increase" | "adjustment_decrease";
@@ -131,6 +231,18 @@ export interface InventoryDetail {
   };
   batches: StockBatch[];
   recent_movements: StockMovement[];
+  supplier_info: {
+    primary_supplier: { id: number; name: string; supplier_sku: string | null } | null;
+    other_suppliers: { id: number; name: string }[];
+    last_stock_in_supplier: { id: number; name: string; received_at: string | null } | null;
+    has_supplier: boolean;
+  };
+  price_info: {
+    current_price: string | null;
+    currency: string | null;
+    effective_date: string | null;
+    has_price: boolean;
+  };
 }
 
 export interface DashboardData {
@@ -146,6 +258,18 @@ export interface DashboardData {
     out_of_stock_count: number;
   };
   recent_movements: StockMovement[];
+  supplier_summary: {
+    total_suppliers: number;
+    active_suppliers: number;
+    recently_used_suppliers: number;
+    top_suppliers_by_quantity: { id: number; name: string; total_units_supplied: number }[];
+  };
+  product_alerts: {
+    missing_supplier_count: number;
+    missing_supplier_sample: { id: number; name: string; sku: string }[];
+    missing_price_count: number;
+    missing_price_sample: { id: number; name: string; sku: string }[];
+  };
 }
 
 export interface AuditLogEntry {
@@ -167,7 +291,10 @@ export type NotificationType =
   | "stock_in"
   | "stock_out"
   | "adjustment"
-  | "admin_activity";
+  | "admin_activity"
+  | "supplier_added"
+  | "product_missing_supplier"
+  | "product_missing_price";
 
 export interface AppNotification {
   id: number;

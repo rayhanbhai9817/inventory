@@ -146,6 +146,74 @@ export default function DashboardPage() {
             </Card>
           </div>
 
+          {(can("supplier_reports.view") || can("product_prices.view")) && (
+            <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {can("supplier_reports.view") && (
+                <Card className="p-5">
+                  <p className="text-sm font-medium text-slate-500">Supplier Summary</p>
+                  <div className="mt-4 grid grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-400">Total Suppliers</p>
+                      <p className="mt-1 text-xl font-semibold text-slate-900">
+                        {data.supplier_summary.total_suppliers}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-400">Active</p>
+                      <p className="mt-1 text-xl font-semibold text-slate-900">
+                        {data.supplier_summary.active_suppliers}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-400">Used This Period</p>
+                      <p className="mt-1 text-xl font-semibold text-slate-900">
+                        {data.supplier_summary.recently_used_suppliers}
+                      </p>
+                    </div>
+                  </div>
+                  {data.supplier_summary.top_suppliers_by_quantity.length > 0 && (
+                    <div className="mt-4 border-t border-slate-100 pt-3">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Top Suppliers by Quantity
+                      </p>
+                      <ul className="space-y-1 text-sm text-slate-600">
+                        {data.supplier_summary.top_suppliers_by_quantity.map((s) => (
+                          <li key={s.id} className="flex justify-between">
+                            <span>{s.name}</span>
+                            <span className="font-medium text-slate-900">{s.total_units_supplied} units</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </Card>
+              )}
+
+              <Card className="p-5">
+                <p className="text-sm font-medium text-slate-500">Data Quality Alerts</p>
+                <div className="mt-3 space-y-2 text-sm">
+                  <div className="flex items-center justify-between rounded-md bg-amber-50 px-3 py-2">
+                    <span className="text-amber-800">Products missing a supplier</span>
+                    <span className="font-semibold text-amber-900">
+                      {data.product_alerts.missing_supplier_count}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-md bg-amber-50 px-3 py-2">
+                    <span className="text-amber-800">Products missing a reference price</span>
+                    <span className="font-semibold text-amber-900">
+                      {data.product_alerts.missing_price_count}
+                    </span>
+                  </div>
+                </div>
+                {data.product_alerts.missing_supplier_count > 0 && (
+                  <Link href="/reports/product-suppliers" className="mt-3 inline-block text-xs text-indigo-600 hover:underline">
+                    View products missing a supplier →
+                  </Link>
+                )}
+              </Card>
+            </div>
+          )}
+
           <Card>
             <div className="border-b border-slate-200 px-4 py-3">
               <p className="text-sm font-medium text-slate-900">Recent Stock Movements</p>
