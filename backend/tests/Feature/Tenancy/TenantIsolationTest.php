@@ -4,7 +4,6 @@ namespace Tests\Feature\Tenancy;
 
 use App\Models\Business;
 use App\Models\Category;
-use App\Models\Unit;
 use App\Support\Tenant;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -41,16 +40,12 @@ class TenantIsolationTest extends TestCase
         $businessA = $this->registerBusiness('Business A', 'ownerA@test.com');
         $businessB = $this->registerBusiness('Business B', 'ownerB@test.com');
 
-        // Create a unit + product directly for business A.
+        // Create a product directly for business A.
         Tenant::set($businessA['business_id']);
-        $unit = Unit::create(['name' => 'Piece', 'short_name' => 'pc']);
         $productResponse = $this->asBearerToken($businessA['token'])
             ->postJson('/api/v1/products', [
                 'name' => 'Secret Widget',
                 'sku' => 'SEC-001',
-                'unit_id' => $unit->id,
-                'cost_price' => 1,
-                'selling_price' => 2,
             ])->assertCreated();
 
         $productId = $productResponse->json('data.id');

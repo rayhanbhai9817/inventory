@@ -1,85 +1,184 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api";
-import type { PaginatedResponse, Product } from "@/types";
-import { StatCard } from "@/components/ui/Card";
+import { useAuth } from "@/lib/auth-context";
+import type { DashboardData } from "@/types";
+import { Card, StatCard } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 
-interface Counts {
-  products: number;
-  lowStock: number;
-  suppliers: number;
-  customers: number;
-  stockValue: number;
-}
+const PERIODS = [
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "week", label: "This Week" },
+  { value: "month", label: "This Month" },
+];
 
 export default function DashboardPage() {
-  const [counts, setCounts] = useState<Counts | null>(null);
+  const { user, can } = useAuth();
+  const [period, setPeriod] = useState("today");
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-
-    async function load() {
-      const [products, lowStock, suppliers, customers] = await Promise.all([
-        api.get<PaginatedResponse<Product>>("/products", { per_page: 100 }),
-        api.get<PaginatedResponse<Product>>("/products", { low_stock: true, per_page: 1 }),
-        api.get<PaginatedResponse<unknown>>("/suppliers", { per_page: 1 }),
-        api.get<PaginatedResponse<unknown>>("/customers", { per_page: 1 }),
-      ]);
-
-      const stockValue = products.data.reduce(
-        (sum, p) => sum + p.cost_price * (p.total_stock ?? 0),
-        0,
-      );
-
-      if (!cancelled) {
-        setCounts({
-          products: products.meta.total,
-          lowStock: lowStock.meta.total,
-          suppliers: suppliers.meta.total,
-          customers: customers.meta.total,
-          stockValue,
-        });
-        setLoading(false);
-      }
-    }
-
-    load();
+    // Reset loading when the period changes; the fetch below sets it
+    // false again asynchronously once the request settles.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    api
+      .get<{ data: DashboardData }>("/dashboard", { period })
+      .then((res) => {
+        if (!cancelled) setData(res.data);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [period]);
+
+  const greetingName = user?.name?.split(" ")[0] ?? "Admin";
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-slate-900">Dashboard</h1>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">Welcome back, {greetingName}! 👋</h1>
+          <p className="mt-1 text-sm text-slate-500">Here&apos;s what&apos;s happening with your inventory today.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex rounded-md border border-slate-300 bg-white p-1 text-sm">
+            {PERIODS.map((p) => (
+              <button
+                key={p.value}
+                onClick={() => setPeriod(p.value)}
+                className={`rounded px-3 py-1.5 font-medium transition-colors ${
+                  period === p.value ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {can("stock.in") && (
+            <Link href="/stock/in">
+              <Button>Stock IN</Button>
+            </Link>
+          )}
+          {can("stock.out") && (
+            <Link href="/stock/out">
+              <Button variant="secondary">Stock OUT</Button>
+            </Link>
+          )}
+        </div>
+      </div>
 
-      {loading ? (
+      {loading || !data ? (
         <p className="text-slate-500">Loading…</p>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Products" value={counts!.products} />
-          <StatCard
-            label="Low stock products"
-            value={counts!.lowStock}
-            hint="At or below minimum stock level"
-          />
-          <StatCard
-            label="Stock value (cost)"
-            value={counts!.stockValue.toLocaleString(undefined, {
-              maximumFractionDigits: 2,
-            })}
-            hint="First 100 products, current page only"
-          />
-          <StatCard label="Suppliers" value={counts!.suppliers} />
-          <StatCard label="Customers" value={counts!.customers} />
-        </div>
-      )}
+        <>
+          <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Card className="p-5">
+              <p className="text-sm font-medium text-slate-500">Period Stock Summary</p>
+              <p className="mt-1 text-xs text-slate-400">
+                {data.period.from} – {data.period.to}
+              </p>
+              <div className="mt-4 grid grid-cols-3 gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-400">Opening</p>
+                  <p className="mt-1 text-xl font-semibold text-slate-900">{data.period_stock_summary.opening}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-400">Net Flow</p>
+                  <p
+                    className={`mt-1 text-xl font-semibold ${
+                      data.period_stock_summary.net_flow >= 0 ? "text-emerald-600" : "text-red-600"
+                    }`}
+                  >
+                    {data.period_stock_summary.net_flow >= 0 ? "+" : ""}
+                    {data.period_stock_summary.net_flow}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-400">Closing Stock</p>
+                  <p className="mt-1 text-xl font-semibold text-slate-900">{data.period_stock_summary.closing}</p>
+                </div>
+              </div>
+            </Card>
 
-      <p className="mt-8 text-sm text-slate-400">
-        Sales, purchases, and revenue KPIs will appear here once those modules are built.
-      </p>
+            <div className="grid grid-cols-2 gap-4">
+              <Card className="p-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">Stock In</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">{data.stock_in_total} Units</p>
+                <p className="mt-1 text-xs text-slate-400">Units received this period</p>
+              </Card>
+              <Card className="p-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-red-600">Stock Out</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">{data.stock_out_total} Units</p>
+                <p className="mt-1 text-xs text-slate-400">Units dispatched this period</p>
+              </Card>
+            </div>
+          </div>
+
+          <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="Total Products" value={data.totals.total_products} />
+            <StatCard label="Total Units" value={data.totals.total_units} hint="Global stock balance" />
+            <StatCard label="Total Boxes" value={data.totals.total_boxes} hint="Approximate box count" />
+            <Card className="p-5">
+              <p className="text-sm font-medium text-slate-500">Inventory Health</p>
+              <p
+                className={`mt-2 text-2xl font-semibold ${
+                  data.inventory_health.status === "optimal"
+                    ? "text-emerald-600"
+                    : data.inventory_health.status === "fair"
+                      ? "text-amber-600"
+                      : "text-red-600"
+                }`}
+              >
+                {data.inventory_health.percent}%
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                {data.inventory_health.low_stock_count} low · {data.inventory_health.out_of_stock_count} out of stock
+              </p>
+            </Card>
+          </div>
+
+          <Card>
+            <div className="border-b border-slate-200 px-4 py-3">
+              <p className="text-sm font-medium text-slate-900">Recent Stock Movements</p>
+            </div>
+            {data.recent_movements.length === 0 ? (
+              <p className="p-4 text-sm text-slate-500">No movements yet.</p>
+            ) : (
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-slate-200 text-slate-500">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">Reference</th>
+                    <th className="px-4 py-2 font-medium">Product</th>
+                    <th className="px-4 py-2 font-medium">Type</th>
+                    <th className="px-4 py-2 font-medium">Units</th>
+                    <th className="px-4 py-2 font-medium">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.recent_movements.map((m) => (
+                    <tr key={m.id} className="border-b border-slate-100 last:border-0">
+                      <td className="px-4 py-2 font-mono text-xs text-slate-500">{m.reference}</td>
+                      <td className="px-4 py-2 text-slate-700">{m.product?.name}</td>
+                      <td className="px-4 py-2 text-slate-700">{m.type.replace("_", " ")}</td>
+                      <td className="px-4 py-2 text-slate-700">{m.units}</td>
+                      <td className="px-4 py-2 text-slate-500">{new Date(m.created_at).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Card>
+        </>
+      )}
     </div>
   );
 }

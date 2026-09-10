@@ -11,23 +11,24 @@ return new class extends Migration
         Schema::create('products', function (Blueprint $table) {
             $table->id();
             $table->foreignId('business_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('category_id')->nullable()->constrained('categories')->nullOnDelete();
-            $table->foreignId('brand_id')->nullable()->constrained('brands')->nullOnDelete();
-            $table->foreignId('unit_id')->constrained('units')->restrictOnDelete();
+            // restrict, not nullOnDelete: a category with products attached
+            // must not be deletable out from under them (see CategoryController).
+            $table->foreignId('category_id')->nullable()->constrained('categories')->restrictOnDelete();
             $table->string('name');
             $table->string('sku');
-            $table->string('barcode')->nullable();
-            $table->decimal('cost_price', 15, 4)->default(0);
-            $table->decimal('selling_price', 15, 4)->default(0);
-            $table->decimal('min_stock_level', 15, 4)->default(0);
             $table->text('description')->nullable();
             $table->string('image_path')->nullable();
-            $table->enum('status', ['active', 'inactive'])->default('active');
+            $table->unsignedInteger('min_stock_level')->default(0);
+            // Lifecycle: active (both null) / archived (archived_at set) /
+            // trashed (deleted_at set, via SoftDeletes). No separate status
+            // enum — these two timestamps are the single source of truth.
+            $table->timestamp('archived_at')->nullable();
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
             $table->softDeletes();
 
             $table->unique(['business_id', 'sku']);
-            $table->index(['business_id', 'barcode']);
+            $table->index(['business_id', 'archived_at']);
         });
     }
 

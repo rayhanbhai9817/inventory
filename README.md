@@ -1,6 +1,10 @@
 # Inventory Management SaaS
 
-A production-grade, multi-tenant Inventory Management SaaS platform.
+A production-grade, multi-tenant warehouse/stock inventory management SaaS
+platform, built around FIFO batch tracking (Stock IN creates a batch,
+Stock OUT consumes oldest-first). It is deliberately **not** a sales/POS/
+ERP system — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the
+scope decision.
 
 - **Frontend:** Next.js (App Router) + React + TypeScript + Tailwind CSS
 - **Backend:** Laravel (REST API) + PHP

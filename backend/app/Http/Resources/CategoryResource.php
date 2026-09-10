@@ -15,6 +15,7 @@ class CategoryResource extends JsonResource
             'name' => $this->name,
             'slug' => $this->slug,
             'status' => $this->status,
+            'product_count' => $this->when(isset($this->products_count), fn () => $this->products_count),
             'created_at' => $this->created_at,
         ];
     }

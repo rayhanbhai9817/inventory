@@ -21,15 +21,9 @@ export function ProductEditForm({ id }: { id: number }) {
         setInitialValues({
           name: p.name,
           sku: p.sku,
-          barcode: p.barcode ?? "",
           category_id: p.category?.id ?? "",
-          brand_id: p.brand?.id ?? "",
-          unit_id: p.unit?.id ?? "",
-          cost_price: p.cost_price,
-          selling_price: p.selling_price,
           min_stock_level: p.min_stock_level,
           description: p.description ?? "",
-          status: p.status,
         });
       })
       .catch((err) => {

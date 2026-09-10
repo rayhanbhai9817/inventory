@@ -2,15 +2,11 @@
 
 namespace Database\Seeders;
 
-use App\Models\Brand;
 use App\Models\Business;
 use App\Models\Category;
-use App\Models\Customer;
 use App\Models\Product;
-use App\Models\Supplier;
-use App\Models\Unit;
 use App\Models\User;
-use App\Models\Warehouse;
+use App\Services\InventoryService;
 use App\Services\TenantProvisioningService;
 use App\Support\Tenant;
 use Illuminate\Database\Seeder;
@@ -22,7 +18,7 @@ use RuntimeException;
  */
 class DemoDataSeeder extends Seeder
 {
-    public function run(TenantProvisioningService $provisioner): void
+    public function run(TenantProvisioningService $provisioner, InventoryService $inventory): void
     {
         if (! app()->environment(['local', 'testing'])) {
             throw new RuntimeException(
@@ -31,8 +27,8 @@ class DemoDataSeeder extends Seeder
         }
 
         $business = Business::create([
-            'name' => 'Demo Retail Co',
-            'slug' => 'demo-retail-co',
+            'name' => 'Ozipco Demo',
+            'slug' => 'ozipco-demo',
             'email' => 'demo@example.com',
             'currency_code' => 'USD',
             'timezone' => 'UTC',
@@ -42,7 +38,7 @@ class DemoDataSeeder extends Seeder
 
         $owner = User::create([
             'business_id' => $business->id,
-            'name' => 'Demo Owner',
+            'name' => 'Demo Admin',
             'email' => 'owner@demo.test',
             'password' => 'password',
         ]);
@@ -57,37 +53,28 @@ class DemoDataSeeder extends Seeder
         ]);
         $staff->assignRole('Staff');
 
-        $warehouse = Warehouse::create([
-            'name' => 'Main Warehouse',
-            'code' => 'WH-1',
-            'is_default' => true,
+        $dewormer = Category::create(['name' => 'Dewormer', 'slug' => 'dewormer']);
+        $ivermectin = Category::create(['name' => 'Ivermectin', 'slug' => 'ivermectin']);
+
+        $catDewormer = Product::create([
+            'category_id' => $dewormer->id,
+            'name' => 'Cat Dewormer Tablet',
+            'sku' => '001',
+            'min_stock_level' => 100,
+            'created_by' => $owner->id,
         ]);
+        $inventory->stockIn($catDewormer, 5, 196, now()->subWeeks(3)->toDateString(), 'Initial stock', $owner);
 
-        $unit = Unit::create(['name' => 'Piece', 'short_name' => 'pc']);
-
-        $category = Category::create(['name' => 'General', 'slug' => 'general']);
-        $brand = Brand::create(['name' => 'Generic', 'slug' => 'generic']);
-
-        $product = Product::create([
-            'category_id' => $category->id,
-            'brand_id' => $brand->id,
-            'unit_id' => $unit->id,
-            'name' => 'Sample Widget',
-            'sku' => 'SKU-0001',
-            'cost_price' => 5.00,
-            'selling_price' => 9.99,
-            'min_stock_level' => 10,
+        $ivermectinPaste = Product::create([
+            'category_id' => $ivermectin->id,
+            'name' => 'Horse Unflavored Ivermectin Paste',
+            'sku' => '003',
+            'min_stock_level' => 200,
+            'created_by' => $owner->id,
         ]);
+        $inventory->stockIn($ivermectinPaste, 5, 434, now()->subWeeks(2)->toDateString(), 'Initial stock', $owner);
+        $inventory->stockOut($ivermectinPaste, 400, 'Dispatched to clinic', $owner);
 
-        $product->stocks()->create([
-            'business_id' => $business->id,
-            'warehouse_id' => $warehouse->id,
-            'quantity' => 0,
-        ]);
-
-        Supplier::create(['name' => 'Demo Supplier Ltd']);
-        Customer::create(['name' => 'Walk-in Customer']);
-
-        $this->command?->info("Demo business created: {$business->slug} — login as owner@demo.test / password");
+        $this->command?->info("Demo business created: {$business->slug} — login as owner@demo.test / password (or staff@demo.test / password)");
     }
 }

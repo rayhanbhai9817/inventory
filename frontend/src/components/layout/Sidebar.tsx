@@ -2,38 +2,99 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/products", label: "Products" },
-  { href: "/categories", label: "Categories" },
-  { href: "/brands", label: "Brands" },
-  { href: "/units", label: "Units" },
-  { href: "/warehouses", label: "Warehouses" },
-  { href: "/suppliers", label: "Suppliers" },
-  { href: "/customers", label: "Customers" },
+interface NavItem {
+  href: string;
+  label: string;
+  permission?: string;
+}
+
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+const NAV: NavGroup[] = [
+  { label: "", items: [{ href: "/dashboard", label: "Dashboard", permission: "dashboard.view" }] },
+  {
+    label: "Inventory",
+    items: [
+      { href: "/inventory", label: "Inventory Overview", permission: "inventory.view" },
+      { href: "/stock/in", label: "Stock IN", permission: "stock.in" },
+      { href: "/stock/out", label: "Stock OUT", permission: "stock.out" },
+      { href: "/stock-ledger", label: "Stock Ledger", permission: "ledger.view" },
+      { href: "/stock/adjustments", label: "Stock Adjustments", permission: "stock.adjust" },
+      { href: "/batches", label: "Batch Inventory", permission: "batches.view" },
+    ],
+  },
+  {
+    label: "Product Management",
+    items: [
+      { href: "/products", label: "Products", permission: "products.view" },
+      { href: "/categories", label: "Categories", permission: "categories.view" },
+    ],
+  },
+  {
+    label: "Activity",
+    items: [
+      { href: "/activity", label: "Daily Activity", permission: "activity.view" },
+      { href: "/audit-log", label: "Audit Log", permission: "audit.view" },
+    ],
+  },
+  {
+    label: "Reports",
+    items: [{ href: "/reports", label: "Reports", permission: "reports.view" }],
+  },
+  {
+    label: "Administration",
+    items: [
+      { href: "/notifications", label: "Notifications" },
+      { href: "/users", label: "Admin Users", permission: "users.view" },
+      { href: "/roles", label: "Roles & Permissions", permission: "roles.view" },
+      { href: "/settings", label: "Settings", permission: "settings.manage" },
+    ],
+  },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { can } = useAuth();
 
   return (
-    <nav className="flex w-56 shrink-0 flex-col gap-1 border-r border-slate-200 bg-white p-4">
-      <div className="mb-4 px-2 text-lg font-semibold text-slate-900">Inventory SaaS</div>
-      {NAV_ITEMS.map((item) => {
-        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+    <nav className="flex w-64 shrink-0 flex-col gap-4 overflow-y-auto border-r border-slate-800 bg-slate-900 p-4">
+      <div className="px-2 py-1 text-base font-semibold tracking-wide text-white">
+        OZIPCO <span className="font-normal text-slate-400">INVENTORY</span>
+      </div>
+
+      {NAV.map((group) => {
+        const items = group.items.filter((item) => !item.permission || can(item.permission));
+        if (items.length === 0) return null;
+
         return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-              active
-                ? "bg-indigo-50 text-indigo-700"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            }`}
-          >
-            {item.label}
-          </Link>
+          <div key={group.label || "top"} className="flex flex-col gap-1">
+            {group.label && (
+              <div className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                {group.label}
+              </div>
+            )}
+            {items.map((item) => {
+              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                    active
+                      ? "bg-indigo-600 text-white"
+                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
         );
       })}
     </nav>

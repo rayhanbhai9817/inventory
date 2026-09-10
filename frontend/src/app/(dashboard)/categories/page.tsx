@@ -15,6 +15,7 @@ export default function CategoriesPage() {
       columns={[
         { key: "name", label: "Name", render: (r) => r.name },
         { key: "slug", label: "Slug", render: (r) => r.slug },
+        { key: "product_count", label: "Products", render: (r) => r.product_count ?? 0 },
         { key: "status", label: "Status", render: (r) => <Badge status={r.status} /> },
       ]}
     />

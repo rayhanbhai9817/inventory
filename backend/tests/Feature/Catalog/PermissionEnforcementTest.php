@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Catalog;
 
-use App\Models\Unit;
 use App\Models\User;
 use App\Support\Tenant;
 use Database\Seeders\PermissionSeeder;
@@ -20,7 +19,7 @@ class PermissionEnforcementTest extends TestCase
         $this->seed(PermissionSeeder::class);
     }
 
-    public function test_staff_role_cannot_delete_products_but_can_view_and_sell(): void
+    public function test_staff_role_cannot_delete_products_or_adjust_stock_but_can_view_and_move_stock(): void
     {
         $register = $this->postJson('/api/v1/auth/register', [
             'business_name' => 'Acme Retail',
@@ -51,14 +50,10 @@ class PermissionEnforcementTest extends TestCase
         $staffToken = $login->json('token');
         $ownerToken = $register->json('token');
 
-        $unit = Unit::create(['name' => 'Piece', 'short_name' => 'pc']);
         $product = $this->asBearerToken($ownerToken)
             ->postJson('/api/v1/products', [
                 'name' => 'Widget',
                 'sku' => 'W-1',
-                'unit_id' => $unit->id,
-                'cost_price' => 1,
-                'selling_price' => 2,
             ])->assertCreated();
 
         $productId = $product->json('data.id');
@@ -68,14 +63,32 @@ class PermissionEnforcementTest extends TestCase
             ->getJson("/api/v1/products/{$productId}")
             ->assertOk();
 
-        // Staff cannot delete (no products.delete permission).
+        // Staff can perform stock in/out (Staff role grants stock.in/stock.out).
+        $this->asBearerToken($staffToken)
+            ->postJson('/api/v1/stock/in', [
+                'product_id' => $productId,
+                'boxes' => 2,
+                'units_per_box' => 10,
+                'received_at' => now()->toDateString(),
+            ])->assertCreated();
+
+        // Staff cannot delete a product (no products.delete permission).
         $this->asBearerToken($staffToken)
             ->deleteJson("/api/v1/products/{$productId}")
             ->assertStatus(403);
 
-        // Staff cannot create suppliers (no suppliers.create permission).
+        // Staff cannot perform a stock adjustment (no stock.adjust permission).
         $this->asBearerToken($staffToken)
-            ->postJson('/api/v1/suppliers', ['name' => 'Rogue Supplier'])
+            ->postJson('/api/v1/stock/adjustments', [
+                'product_id' => $productId,
+                'direction' => 'increase',
+                'quantity' => 5,
+                'reason' => 'found',
+            ])->assertStatus(403);
+
+        // Staff cannot manage users (no users.create permission).
+        $this->asBearerToken($staffToken)
+            ->postJson('/api/v1/users', ['name' => 'Rogue', 'email' => 'rogue@acme.test', 'password' => 'password1234', 'role' => 'Staff'])
             ->assertStatus(403);
 
         // Owner can delete.

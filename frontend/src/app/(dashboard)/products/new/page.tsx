@@ -11,21 +11,9 @@ export default function NewProductPage() {
 
   return (
     <EntityForm
-      title="New Product"
+      title="Add Product"
       fields={fields}
-      initialValues={{
-        name: "",
-        sku: "",
-        barcode: "",
-        category_id: "",
-        brand_id: "",
-        unit_id: "",
-        cost_price: "",
-        selling_price: "",
-        min_stock_level: 0,
-        description: "",
-        status: "active",
-      }}
+      initialValues={{ name: "", sku: "", category_id: "", min_stock_level: 0, description: "" }}
       cancelHref="/products"
       onSubmit={async (values) => {
         await api.post("/products", values);

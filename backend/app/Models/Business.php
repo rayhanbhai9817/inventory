@@ -21,11 +21,6 @@ class Business extends Model
         return $this->hasMany(User::class);
     }
 
-    public function warehouses(): HasMany
-    {
-        return $this->hasMany(Warehouse::class);
-    }
-
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);

@@ -12,27 +12,18 @@ return new class extends Migration
             $table->id();
             $table->foreignId('business_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('warehouse_id')->constrained()->cascadeOnDelete();
-            $table->enum('type', [
-                'opening',
-                'purchase',
-                'purchase_return',
-                'sale',
-                'sales_return',
-                'adjustment_increase',
-                'adjustment_decrease',
-                'transfer_in',
-                'transfer_out',
-            ]);
-            $table->decimal('quantity', 15, 4);
-            $table->decimal('quantity_before', 15, 4);
-            $table->decimal('quantity_after', 15, 4);
-            $table->nullableMorphs('reference');
-            $table->text('notes')->nullable();
-            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
-            $table->timestamps();
+            $table->enum('type', ['stock_in', 'stock_out', 'adjustment_increase', 'adjustment_decrease']);
+            $table->unsignedInteger('units');
+            // Snapshot of the product's total remaining units immediately
+            // after this movement — makes the ledger displayable without
+            // replaying history, and movement rows are otherwise immutable.
+            $table->unsignedInteger('balance_after');
+            $table->text('note')->nullable();
+            $table->foreignId('user_id')->constrained()->restrictOnDelete();
+            $table->timestamp('created_at');
 
-            $table->index(['business_id', 'product_id', 'warehouse_id']);
+            $table->index(['business_id', 'product_id', 'created_at']);
+            $table->index(['business_id', 'type', 'created_at']);
         });
     }
 

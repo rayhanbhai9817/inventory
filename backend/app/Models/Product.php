@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,8 +12,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
-    'business_id', 'category_id', 'brand_id', 'unit_id', 'name', 'sku', 'barcode',
-    'cost_price', 'selling_price', 'min_stock_level', 'description', 'image_path', 'status',
+    'business_id', 'category_id', 'name', 'sku', 'description',
+    'image_path', 'min_stock_level', 'created_by',
 ])]
 class Product extends Model
 {
@@ -21,10 +22,32 @@ class Product extends Model
     protected function casts(): array
     {
         return [
-            'cost_price' => 'decimal:4',
-            'selling_price' => 'decimal:4',
-            'min_stock_level' => 'decimal:4',
+            'archived_at' => 'datetime',
         ];
+    }
+
+    public function scopeActive(Builder $query): void
+    {
+        $query->whereNull('archived_at');
+    }
+
+    public function scopeArchived(Builder $query): void
+    {
+        $query->whereNotNull('archived_at');
+    }
+
+    public function isArchived(): bool
+    {
+        return $this->archived_at !== null;
+    }
+
+    public function lifecycleStatus(): string
+    {
+        if ($this->trashed()) {
+            return 'trashed';
+        }
+
+        return $this->isArchived() ? 'archived' : 'active';
     }
 
     public function category(): BelongsTo
@@ -32,28 +55,35 @@ class Product extends Model
         return $this->belongsTo(Category::class);
     }
 
-    public function brand(): BelongsTo
+    public function creator(): BelongsTo
     {
-        return $this->belongsTo(Brand::class);
+        return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function unit(): BelongsTo
+    public function batches(): HasMany
     {
-        return $this->belongsTo(Unit::class);
+        return $this->hasMany(StockBatch::class);
     }
 
-    public function stocks(): HasMany
-    {
-        return $this->hasMany(ProductStock::class);
-    }
-
-    public function stockMovements(): HasMany
+    public function movements(): HasMany
     {
         return $this->hasMany(StockMovement::class);
     }
 
-    public function totalStock(): float
+    /**
+     * Live aggregate over batches — deliberately not cached/denormalized,
+     * since a stale cached total is worse than one extra SUM() query for
+     * inventory numbers (see docs/ARCHITECTURE.md).
+     */
+    public function totalRemainingUnits(): int
     {
-        return (float) $this->stocks()->sum('quantity');
+        return (int) $this->batches()->where('status', '!=', 'depleted')->sum('remaining_units');
+    }
+
+    public function totalBoxes(): float
+    {
+        $batches = $this->batches()->where('status', '!=', 'depleted')->get(['units_per_box', 'remaining_units']);
+
+        return round($batches->sum(fn ($b) => $b->remaining_units / max($b->units_per_box, 1)), 2);
     }
 }

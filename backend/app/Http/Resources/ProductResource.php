@@ -9,35 +9,39 @@ class ProductResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        // Computed in PHP over an eager-loaded `batches` relation (loaded
+        // once per page via a single IN(...) query by the controller) —
+        // deliberately not a live per-row aggregate query, to avoid N+1.
+        $activeBatches = $this->whenLoaded('batches', fn () => $this->batches->where('status', '!=', 'depleted'));
+
+        $totalUnits = null;
+        $totalBoxes = null;
+        $unitsPerBox = null;
+
+        if ($activeBatches !== null) {
+            $totalUnits = (int) $activeBatches->sum('remaining_units');
+            $totalBoxes = round($activeBatches->sum(fn ($b) => $b->remaining_units / max($b->units_per_box, 1)), 2);
+            $distinctRatios = $activeBatches->pluck('units_per_box')->unique();
+            $unitsPerBox = $distinctRatios->count() === 1 ? $distinctRatios->first() : null;
+        }
+
         return [
             'id' => $this->id,
-            'name' => $this->name,
             'sku' => $this->sku,
-            'barcode' => $this->barcode,
-            'category' => $this->whenLoaded('category', fn () => [
-                'id' => $this->category->id,
-                'name' => $this->category->name,
-            ]),
-            'brand' => $this->whenLoaded('brand', fn () => [
-                'id' => $this->brand->id,
-                'name' => $this->brand->name,
-            ]),
-            'unit' => $this->whenLoaded('unit', fn () => [
-                'id' => $this->unit->id,
-                'name' => $this->unit->name,
-                'short_name' => $this->unit->short_name,
-            ]),
-            'cost_price' => (float) $this->cost_price,
-            'selling_price' => (float) $this->selling_price,
-            'min_stock_level' => (float) $this->min_stock_level,
-            'total_stock' => $this->when(
-                $this->relationLoaded('stocks'),
-                fn () => (float) $this->stocks->sum('quantity')
-            ),
-            'stocks' => WarehouseStockResource::collection($this->whenLoaded('stocks')),
+            'name' => $this->name,
             'description' => $this->description,
             'image_path' => $this->image_path,
-            'status' => $this->status,
+            'category' => $this->whenLoaded('category', fn () => $this->category ? [
+                'id' => $this->category->id,
+                'name' => $this->category->name,
+            ] : null),
+            'min_stock_level' => $this->min_stock_level,
+            'total_units' => $totalUnits,
+            'total_boxes' => $totalBoxes,
+            'units_per_box' => $unitsPerBox,
+            'status' => $this->lifecycleStatus(),
+            'archived_at' => $this->archived_at,
+            'deleted_at' => $this->deleted_at,
             'created_at' => $this->created_at,
         ];
     }
